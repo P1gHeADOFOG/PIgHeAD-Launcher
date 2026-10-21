@@ -1,4 +1,5 @@
 # PIgHeAD - 猪头启动器 · v0.1.4beta
+本启动器仅供作者与朋友使用，请不要二次分发，在中国大陆境内禁止使用
 
 使用 C#、WPF、.NET 10 与 MVVM 构建的 Minecraft Java Edition 启动器。
 

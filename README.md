@@ -3,7 +3,7 @@
 
 使用 C#、WPF、.NET 10 与 MVVM 构建的 Minecraft Java Edition 启动器。
 
-下载：[v0.1.4beta Windows x64 预发布](https://github.com/P1gHeADOFOG/PIgHeAD-Launcher/releases/tag/v0.1.4beta)。ZIP 包已包含 .NET 10，完整解压后运行 `PIgHeAD.Launcher.exe`，无需自行安装 .NET。此版本的 Minecraft API 尚未获批，真实正版登录仍待验收。
+下载：[v0.1.4beta Windows x64](https://github.com/P1gHeADOFOG/PIgHeAD-Launcher/releases/tag/v0.1.4beta)。ZIP 包已包含 .NET 10，完整解压后运行 `PIgHeAD.Launcher.exe`，无需自行安装 .NET。此版本的 Minecraft API 尚未获批，真实正版登录仍待验收。
 
 本次图标与启动接入的完整文件清单见 [改动记录](docs/Launch-Integration-Changes.md)。
 首次使用协议、高级设置、加载器下载与本次文件清单见 [高级功能说明](docs/Advanced-Features.md)。

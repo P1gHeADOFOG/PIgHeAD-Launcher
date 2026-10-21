@@ -1,0 +1,59 @@
+<UserControl x:Class="PIgHeAD.Launcher.Views.VersionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="Versions" Style="{StaticResource PageTitleStyle}" />
+            <TextBlock Text="导入已有游戏或整合包，选择版本并校验 / 修复缺失文件。" Style="{StaticResource CaptionStyle}" />
+        </StackPanel>
+        <WrapPanel Grid.Row="1" Margin="0,16,0,20">
+            <Button Content="刷新本地版本" Command="{Binding RefreshLocalCommand}" Margin="0,0,12,8" />
+            <Button Content="读取在线原版列表" Command="{Binding LoadOnlineCommand}" Margin="0,0,12,8" />
+            <Button Content="下载所选版本" Command="{Binding InstallSelectedCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,12,8" />
+            <Button Content="修复游戏" Command="{Binding RepairSelectedCommand}" Margin="0,0,12,8"/>
+            <Button Content="取消当前操作" Command="{Binding DataContext.Downloads.CancelCurrentCommand, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,0,0,8" />
+        </WrapPanel>
+        <Border Grid.Row="2" Padding="18" Margin="0,0,0,16" CornerRadius="10" BorderThickness="1">
+            <Border.Style><Style TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                <Style.Triggers><DataTrigger Binding="{Binding IsDragOver}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource ElevatedBrush}"/>
+                </DataTrigger></Style.Triggers>
+            </Style></Border.Style>
+            <StackPanel>
+                <TextBlock Text="拖入 ZIP / .mrpack 整合包，或包含 .minecraft 的文件夹" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                <WrapPanel>
+                    <Button Content="导入压缩整合包…" Command="{Binding ImportArchiveCommand}" Margin="0,0,10,8"/>
+                    <Button Content="接入游戏目录…" Command="{Binding ImportDirectoryCommand}" Margin="0,0,10,8"/>
+                    <CheckBox Content="导入后校验并补全文件（需要网络）" IsChecked="{Binding CompleteImportedFiles}" IsEnabled="{Binding CanImport}" VerticalAlignment="Center" Margin="4,0,0,8"/>
+                </WrapPanel>
+                <TextBlock Text="每次导入一个项目。ZIP 可先跳过补全，稍后修复；.mrpack 需勾选补全并联网安装。压缩包解压到独立目录，目录接入不会移动原文件。" Style="{StaticResource CaptionStyle}" FontSize="12"/>
+            </StackPanel>
+        </Border>
+        <ListBox Grid.Row="3" ItemsSource="{Binding AvailableVersions}"
+                 SelectedItem="{Binding SelectedGameVersion, Mode=TwoWay}"
+                 IsEnabled="{Binding DataContext.Downloads.IsIdle, RelativeSource={RelativeSource AncestorType=Window}}"
+                 Background="{DynamicResource InputBrush}" Foreground="{DynamicResource TextBrush}"
+                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ItemContainerStyle="{StaticResource ContentListItemStyle}" AutomationProperties.Name="Minecraft 版本列表">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel>
+                        <TextBlock Text="{Binding Id}" FontSize="17" FontWeight="SemiBold"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+                        <TextBlock Text="{Binding DisplayName}" Style="{StaticResource CaptionStyle}" FontSize="11" Margin="0,6,0,0" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock Grid.Row="4" Text="{Binding Status}" Style="{StaticResource CaptionStyle}" Margin="0,16,0,0"
+                   AutomationProperties.LiveSetting="Polite" />
+    </Grid>
+</UserControl>

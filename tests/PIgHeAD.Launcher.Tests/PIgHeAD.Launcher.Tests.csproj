@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../PIgHeAD.Launcher/PIgHeAD.Launcher.csproj" />
+    <ProjectReference Include="../PIgHeAD.Launcher.ProcessProbe/PIgHeAD.Launcher.ProcessProbe.csproj" ReferenceOutputAssembly="false" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <Target Name="CopyProcessProbe" AfterTargets="Build">
+    <ItemGroup>
+      <ProcessProbeFiles Include="../PIgHeAD.Launcher.ProcessProbe/bin/$(Configuration)/net10.0/PIgHeAD.Launcher.ProcessProbe.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ProcessProbeFiles)" DestinationFolder="$(OutDir)ProcessProbe" />
+  </Target>
+</Project>

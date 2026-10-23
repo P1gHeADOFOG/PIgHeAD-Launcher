@@ -1,6 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <!-- Original WPF vector artwork: a quiet, block-shaped overworld at dusk. -->
+    <!-- Shared geometry keeps the two landscapes aligned while the palette follows the theme. -->
     <DrawingImage x:Key="OverworldArtwork">
         <DrawingImage.Drawing>
             <DrawingGroup>
@@ -20,8 +20,34 @@
                 <GeometryDrawing Brush="#3E625B" Geometry="M200,240 L200,210 274,210 274,232 348,232 348,196 422,196 422,224 496,224 496,204 570,204 570,230 644,230 644,198 718,198 718,213 792,213 792,187 866,187 866,225 900,225 900,300 200,300 Z" />
                 <GeometryDrawing Brush="#244641" Geometry="M240,270 L240,242 336,242 336,255 432,255 432,233 528,233 528,264 624,264 624,238 720,238 720,259 816,259 816,236 900,236 900,300 240,300 Z" />
                 <GeometryDrawing Brush="#172F31" Geometry="M559,208 L571,208 571,272 559,272 Z M525,178 L542,178 542,158 552,158 552,138 578,138 578,158 590,158 590,178 607,178 607,215 525,215 Z M775,188 L787,188 787,258 775,258 Z M741,160 L757,160 757,138 769,138 769,116 793,116 793,138 806,138 806,160 822,160 822,196 741,196 Z" />
-                <GeometryDrawing Brush="#274C43" Geometry="M490,274 L490,260 538,260 538,274 Z M660,259 L660,247 700,247 700,259 Z M837,280 L837,264 879,264 879,280 Z" />
+                <GeometryDrawing Brush="#244641" Geometry="M490,274 L490,260 538,260 538,274 Z M660,259 L660,247 700,247 700,259 Z M837,280 L837,264 879,264 879,280 Z" />
                 <GeometryDrawing Brush="#A0B6A1" Geometry="M428,221 L432,221 432,229 428,229 Z M441,215 L445,215 445,225 441,225 Z M691,226 L695,226 695,234 691,234 Z" />
+                <GeometryDrawing Brush="#F2A8BC" Geometry="M681,228 L685,228 685,232 681,232 Z M698,220 L702,220 702,224 698,224 Z" />
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="OverworldDayArtwork">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#91D6F3" Offset="0" />
+                            <GradientStop Color="#D9F2E3" Offset="1" />
+                        </LinearGradientBrush>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="0,0,900,300" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#ECF9FF" Geometry="M475,50 L488,50 488,39 524,39 524,50 550,50 550,64 475,64 Z M756,70 L772,70 772,59 798,59 798,70 830,70 830,82 756,82 Z"/>
+                <GeometryDrawing Brush="#FFF1A6" Geometry="M669,36 L721,36 721,88 669,88 Z" />
+                <GeometryDrawing Brush="#93C68C" Geometry="M270,206 L270,175 322,175 322,148 374,148 374,120 426,120 426,150 478,150 478,182 530,182 530,157 582,157 582,127 634,127 634,159 686,159 686,182 738,182 738,148 790,148 790,117 842,117 842,150 900,150 900,300 270,300 Z" />
+                <GeometryDrawing Brush="#65A979" Geometry="M200,240 L200,210 274,210 274,232 348,232 348,196 422,196 422,224 496,224 496,204 570,204 570,230 644,230 644,198 718,198 718,213 792,213 792,187 866,187 866,225 900,225 900,300 200,300 Z" />
+                <GeometryDrawing Brush="#468F66" Geometry="M240,270 L240,242 336,242 336,255 432,255 432,233 528,233 528,264 624,264 624,238 720,238 720,259 816,259 816,236 900,236 900,300 240,300 Z" />
+                <GeometryDrawing Brush="#286650" Geometry="M559,208 L571,208 571,272 559,272 Z M525,178 L542,178 542,158 552,158 552,138 578,138 578,158 590,158 590,178 607,178 607,215 525,215 Z M775,188 L787,188 787,258 775,258 Z M741,160 L757,160 757,138 769,138 769,116 793,116 793,138 806,138 806,160 822,160 822,196 741,196 Z" />
+                <GeometryDrawing Brush="#468F66" Geometry="M490,274 L490,260 538,260 538,274 Z M660,259 L660,247 700,247 700,259 Z M837,280 L837,264 879,264 879,280 Z" />
+                <GeometryDrawing Brush="#D5EAA3" Geometry="M428,221 L432,221 432,229 428,229 Z M441,215 L445,215 445,225 441,225 Z M691,226 L695,226 695,234 691,234 Z" />
                 <GeometryDrawing Brush="#F2A8BC" Geometry="M681,228 L685,228 685,232 681,232 Z M698,220 L702,220 702,224 698,224 Z" />
             </DrawingGroup>
         </DrawingImage.Drawing>

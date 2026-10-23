@@ -13,16 +13,20 @@ public partial class VersionsViewModel : ObservableObject
     private readonly DownloadsViewModel downloads;
     private readonly IGameImportService? imports;
     private readonly IDesktopService? desktop;
+    private readonly ILocalVersionService localVersions;
+    private int detailsGeneration;
     private string? configuredDirectory;
+    public SettingsViewModel Settings => settings;
 
     public VersionsViewModel(IGameService games, SettingsViewModel settings, DownloadsViewModel downloads,
-        IGameImportService? imports = null, IDesktopService? desktop = null)
+        IGameImportService? imports = null, IDesktopService? desktop = null, ILocalVersionService? localVersions = null)
     {
         this.games = games;
         this.settings = settings;
         this.downloads = downloads;
         this.imports = imports;
         this.desktop = desktop;
+        this.localVersions = localVersions ?? new Services.Minecraft.LocalVersionService();
         settings.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(SettingsViewModel.SavedSettings))
@@ -40,6 +44,7 @@ public partial class VersionsViewModel : ObservableObject
             {
                 NotifyCommands();
             }
+            if (e.PropertyName == nameof(SettingsViewModel.SelectedGameDirectory)) SwitchDirectoryCommand.NotifyCanExecuteChanged();
         };
         downloads.PropertyChanged += (_, e) =>
         {
@@ -53,21 +58,45 @@ public partial class VersionsViewModel : ObservableObject
     public ObservableCollection<GameVersionInfo> AvailableVersions { get; } = [];
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(InstallSelectedCommand), nameof(RepairSelectedCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RepairSelectedCommand))]
     public partial GameVersionInfo? SelectedGameVersion { get; set; }
+
+    partial void OnSelectedGameVersionChanged(GameVersionInfo? value)
+    {
+        detailsGeneration++;
+        Details = null;
+        Mods.Clear();
+        IsModsVisible = false;
+        IsDeleteConfirmationVisible = false;
+        NotifyCommands();
+    }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDetails), nameof(CanViewMods))]
+    public partial LocalVersionDetails? Details { get; private set; }
+    partial void OnDetailsChanged(LocalVersionDetails? value) => NotifyCommands();
+    public bool HasDetails => Details is not null;
+    public bool CanViewMods => Details?.SupportsMods == true;
+    public ObservableCollection<LocalModInfo> Mods { get; } = [];
+    [ObservableProperty] public partial bool IsModsVisible { get; private set; }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmDeleteCommand))]
+    public partial bool IsDeleteConfirmationVisible { get; private set; }
 
     [ObservableProperty]
     public partial string Status { get; private set; } = "正在等待配置…";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RefreshLocalCommand), nameof(LoadOnlineCommand), nameof(InstallSelectedCommand),
+    [NotifyCanExecuteChangedFor(nameof(RefreshLocalCommand),
         nameof(RepairSelectedCommand), nameof(ImportArchiveCommand), nameof(ImportDirectoryCommand))]
     public partial bool IsLoading { get; private set; }
 
     private bool CanRefresh() => settings.SavedSettings is not null && downloads.IsIdle && !IsLoading
         && !settings.IsAccountOperationInProgress && !settings.IsBusy;
-    private bool CanInstall() => CanRefresh() && SelectedGameVersion is not null;
     private bool CanRepair() => CanRefresh() && SelectedGameVersion?.IsInstalled == true;
+    private bool CanManageVersion(GameVersionInfo? version) => CanRefresh() && version?.IsInstalled == true;
+    private bool CanReadMods() => CanRefresh() && CanViewMods;
+    private bool CanConfirmDelete() => CanRefresh() && IsDeleteConfirmationVisible && Details?.VersionId == SelectedGameVersion?.Id;
     public bool CanImport => CanRefresh() && imports is not null;
     private bool CanPickImport() => CanImport && desktop is not null;
     [ObservableProperty] public partial bool CompleteImportedFiles { get; set; } = true;
@@ -77,13 +106,27 @@ public partial class VersionsViewModel : ObservableObject
     private void NotifyCommands()
     {
         RefreshLocalCommand.NotifyCanExecuteChanged();
-        LoadOnlineCommand.NotifyCanExecuteChanged();
-        InstallSelectedCommand.NotifyCanExecuteChanged();
+        ShowDetailsCommand.NotifyCanExecuteChanged();
+        RequestDeleteCommand.NotifyCanExecuteChanged();
+        ConfirmDeleteCommand.NotifyCanExecuteChanged();
+        CancelDeleteCommand.NotifyCanExecuteChanged();
+        ViewModsCommand.NotifyCanExecuteChanged();
         RepairSelectedCommand.NotifyCanExecuteChanged();
         ImportArchiveCommand.NotifyCanExecuteChanged();
         ImportDirectoryCommand.NotifyCanExecuteChanged();
         ImportPathCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanImport));
+        SwitchDirectoryCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanSwitchDirectory() => CanRefresh() && settings.CanSwitchGameDirectory;
+
+    [RelayCommand(CanExecute = nameof(CanSwitchDirectory))]
+    private async Task SwitchDirectoryAsync()
+    {
+        await settings.SwitchGameDirectoryCommand.ExecuteAsync(null);
+        if (!settings.HasError) await RefreshAsync(CancellationToken.None);
+        else Status = settings.StatusMessage;
     }
 
     [RelayCommand(CanExecute = nameof(CanPickImport))]
@@ -119,7 +162,7 @@ public partial class VersionsViewModel : ObservableObject
             // Once the import has committed, complete its small settings registration without cancellation.
             await settings.ActivateImportedGameAsync(result, CancellationToken.None);
             downloads.End(result.Description);
-            await RefreshAsync(false, CancellationToken.None);
+            await RefreshAsync(CancellationToken.None);
             SelectedGameVersion = AvailableVersions.FirstOrDefault(version => version.Id == result.SelectedVersionId) ?? SelectedGameVersion;
             Status = $"{result.Description} 当前目录：{result.GameDirectory}";
         }
@@ -144,23 +187,20 @@ public partial class VersionsViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanRefresh))]
-    private Task RefreshLocalAsync(CancellationToken cancellationToken) => RefreshAsync(false, cancellationToken);
+    private Task RefreshLocalAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
 
-    [RelayCommand(CanExecute = nameof(CanRefresh))]
-    private Task LoadOnlineAsync(CancellationToken cancellationToken) => RefreshAsync(true, cancellationToken);
-
-    private async Task RefreshAsync(bool online, CancellationToken cancellationToken)
+    private async Task RefreshAsync(CancellationToken cancellationToken)
     {
         if (settings.SavedSettings is not { } snapshot)
         {
             return;
         }
         IsLoading = true;
-        Status = online ? "正在读取官方版本列表…" : "正在扫描本地版本…";
+        Status = "正在扫描本地版本…";
         var previous = SelectedGameVersion?.Id ?? snapshot.PreferredVersionId;
         try
         {
-            var versions = await games.GetVersionsAsync(snapshot.GameDirectory, online, cancellationToken);
+            var versions = (await games.GetVersionsAsync(snapshot.GameDirectory, false, cancellationToken)).Where(version => version.IsInstalled).ToArray();
             if (snapshot != settings.SavedSettings)
             {
                 Status = "配置已变化，请重新刷新版本。";
@@ -174,37 +214,104 @@ public partial class VersionsViewModel : ObservableObject
             SelectedGameVersion = AvailableVersions.FirstOrDefault(v => v.Id == previous)
                 ?? AvailableVersions.FirstOrDefault(v => v.IsInstalled)
                 ?? AvailableVersions.FirstOrDefault();
-            Status = versions.Count == 0
-                ? "没有本地版本，请检查游戏目录或读取在线列表后下载。"
-                : $"共 {versions.Count} 个版本。标记“本地”表示已有版本元数据，启动前仍可检查缺失文件。";
+            Status = versions.Length == 0
+                ? "没有本地版本，可接入已有目录或前往下载中心安装。"
+                : $"共 {versions.Length} 个本地版本，可查看详情、修复或删除。";
         }
         catch (OperationCanceledException) { Status = "版本读取已取消。"; }
         catch (Exception exception) { Status = $"版本读取失败：{exception.Message}"; }
         finally { IsLoading = false; }
     }
 
-    [RelayCommand(CanExecute = nameof(CanInstall), IncludeCancelCommand = true)]
-    private async Task InstallSelectedAsync(CancellationToken cancellationToken)
+    [RelayCommand(CanExecute = nameof(CanManageVersion))]
+    private Task ShowDetailsAsync(GameVersionInfo version, CancellationToken cancellationToken) => LoadDetailsAsync(version, cancellationToken);
+
+    private async Task LoadDetailsAsync(GameVersionInfo version, CancellationToken token)
     {
-        if (settings.SavedSettings is not { } snapshot || SelectedGameVersion is not { } version)
-        {
-            return;
-        }
-        downloads.Begin("开始准备游戏文件…", InstallSelectedCommand.Cancel);
+        if (settings.SavedSettings is not { } snapshot || !version.IsInstalled) return;
+        SelectedGameVersion = version;
+        var generation = ++detailsGeneration;
+        IsLoading = true;
+        Details = null;
+        IsModsVisible = false;
+        IsDeleteConfirmationVisible = false;
+        Mods.Clear();
         try
         {
-            await games.InstallAsync(snapshot, version, downloads.CreateProgress(), cancellationToken);
-            downloads.End("下载及校验完成");
-            await RefreshAsync(false, cancellationToken);
-        }
-        catch (OperationCanceledException) { downloads.End("下载已取消，可稍后重新检查并继续。"); }
-        catch (Exception exception) { downloads.End($"下载失败：{exception.Message}"); }
-        finally
-        {
-            if (downloads.IsBusy)
+            var details = await localVersions.GetDetailsAsync(snapshot, version, token);
+            if (generation == detailsGeneration && snapshot.GameDirectory == settings.SavedSettings?.GameDirectory)
             {
-                downloads.End("准备已结束");
+                Details = details;
+                Status = "本地版本详情已就绪。";
             }
         }
+        catch (OperationCanceledException) { Status = "详情读取已取消。"; }
+        catch (Exception error) { Status = "无法读取版本详情：" + error.Message; }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanReadMods))]
+    private async Task ViewModsAsync(CancellationToken token)
+    {
+        var details = Details!;
+        var generation = detailsGeneration;
+        IsLoading = true;
+        Mods.Clear();
+        IsModsVisible = false;
+        try
+        {
+            var mods = await localVersions.GetModsAsync(details, token);
+            if (generation != detailsGeneration || Details != details) return;
+            foreach (var mod in mods) Mods.Add(mod);
+            IsModsVisible = true;
+            Status = $"已读取 {mods.Count} 个本地模组条目。";
+        }
+        catch (OperationCanceledException) { Status = "模组读取已取消。"; }
+        catch (Exception error) { Status = "无法读取模组列表：" + error.Message; }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanManageVersion))]
+    private async Task RequestDeleteAsync(GameVersionInfo version, CancellationToken token)
+    {
+        await LoadDetailsAsync(version, token);
+        if (Details?.VersionId == version.Id) IsDeleteConfirmationVisible = true;
+    }
+
+    [RelayCommand]
+    private void ReturnToDetails() => IsModsVisible = false;
+
+    private bool CanCancelDelete() => !IsLoading;
+
+    [RelayCommand(CanExecute = nameof(CanCancelDelete))]
+    private void CancelDelete() => IsDeleteConfirmationVisible = false;
+
+    [RelayCommand]
+    private void CloseDetails()
+    {
+        detailsGeneration++;
+        Details = null;
+        Mods.Clear();
+        IsModsVisible = false;
+        IsDeleteConfirmationVisible = false;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanConfirmDelete))]
+    private async Task ConfirmDeleteAsync(CancellationToken token)
+    {
+        if (!CanConfirmDelete() || settings.SavedSettings is not { } snapshot || SelectedGameVersion is not { } version) return;
+        IsLoading = true;
+        downloads.Begin("删除本地版本");
+        try
+        {
+            await localVersions.DeleteAsync(snapshot, version, token);
+            CloseDetails();
+            downloads.End("版本已移入回收站。");
+            await RefreshAsync(CancellationToken.None);
+            Status = "版本已移入回收站。共享资源与其他实例目录保留。";
+        }
+        catch (OperationCanceledException) { Status = "删除已取消。"; downloads.End(Status); }
+        catch (Exception error) { Status = "无法删除版本：" + error.Message; downloads.End(Status); }
+        finally { IsLoading = false; }
     }
 }

@@ -1,72 +1,88 @@
 <UserControl x:Class="PIgHeAD.Launcher.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:PIgHeAD.Launcher.Services.Presentation"
+             xmlns:ui="clr-namespace:PIgHeAD.Launcher.Services.Presentation">
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="0,0,12,0">
-            <TextBlock Text="启动设置" Style="{StaticResource PageTitleStyle}" />
-            <TextBlock Text="{Binding VersionDisplay}" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,8"/>
-            <TextBlock Text="配置会保存在当前 Windows 用户的数据目录中。"
+            <TextBlock Text="{loc:Loc '启动设置'}" Style="{StaticResource PageTitleStyle}" />
+            <TextBlock Text="{loc:Translate {Binding VersionDisplay}}" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,8"/>
+            <TextBlock Text="{loc:Loc '游戏设置保存在对应游戏文件夹的 PHL 中；游戏目录列表与登录缓存在启动器旁的 PHL 中。'}"
                        Style="{StaticResource CaptionStyle}" Margin="0,0,0,24" />
             <Border Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <TextBlock Text="{loc:Loc '界面与语言'}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                    <TextBlock Text="{loc:Loc '外观与语言立即生效，自动保存并在所有游戏目录间共享。'}" Style="{StaticResource CaptionStyle}"/>
+                    <WrapPanel Margin="0,8,0,0">
+                        <Button Content="{Binding ThemeSwitchLabel, Source={x:Static ui:PresentationSettings.Current}}"
+                                Command="{Binding ToggleThemeCommand, Source={x:Static ui:PresentationSettings.Current}}" Margin="0,0,12,0"/>
+                        <Button Content="{Binding LanguageSwitchLabel, Source={x:Static ui:PresentationSettings.Current}}"
+                                Command="{Binding ToggleLanguageCommand, Source={x:Static ui:PresentationSettings.Current}}"
+                                ToolTip="切换界面语言 / Switch language"/>
+                    </WrapPanel>
+                    <TextBlock Text="{loc:Translate {Binding Status, Source={x:Static ui:PresentationSettings.Current}}}" Foreground="{DynamicResource ErrorBrush}" FontSize="12" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardStyle}">
                 <StackPanel IsEnabled="{Binding CanEdit}">
-                    <Label Content="游戏目录" Target="{Binding ElementName=GameDirectoryInput}" />
+                    <Label Content="{loc:Loc '游戏目录'}" Target="{Binding ElementName=GameDirectoryInput}" />
                     <TextBox x:Name="GameDirectoryInput" Text="{Binding GameDirectory, UpdateSourceTrigger=PropertyChanged}" />
-                    <Button Content="选择游戏目录…" Command="{Binding BrowseDirectoryCommand}" HorizontalAlignment="Left" Margin="0,0,0,18"/>
-                    <Label Content="Java 可执行文件路径（可留空）" Target="{Binding ElementName=JavaPathInput}" />
+                    <Button Content="{loc:Loc '选择游戏目录…'}" Command="{Binding BrowseDirectoryCommand}" HorizontalAlignment="Left" Margin="0,0,0,18"/>
+                    <Label Content="{loc:Loc 'Java 可执行文件路径（可留空）'}" Target="{Binding ElementName=JavaPathInput}" />
                     <TextBox x:Name="JavaPathInput" Text="{Binding JavaPath, UpdateSourceTrigger=PropertyChanged}" />
-                    <Button Content="选择 Java…" Command="{Binding BrowseJavaCommand}" HorizontalAlignment="Left" Margin="0,0,0,18"/>
-                    <CheckBox Content="自动分配内存（启动时按可用物理内存计算）" IsChecked="{Binding AutomaticMemory}" Margin="0,0,0,16"/>
-                    <Label Content="最大内存（MiB）" Target="{Binding ElementName=MemoryInput}" />
+                    <Button Content="{loc:Loc '选择 Java…'}" Command="{Binding BrowseJavaCommand}" HorizontalAlignment="Left" Margin="0,0,0,18"/>
+                    <CheckBox Content="{loc:Loc '自动分配内存（启动时按可用物理内存计算）'}" IsChecked="{Binding AutomaticMemory}" Margin="0,0,0,16"/>
+                    <Label Content="{loc:Loc '最大内存（MiB）'}" Target="{Binding ElementName=MemoryInput}" />
                     <TextBox x:Name="MemoryInput" Text="{Binding MaximumMemoryMb, UpdateSourceTrigger=PropertyChanged}"
                              MaxLength="10" Margin="0,0,0,8" IsEnabled="{Binding CanEditManualMemory}"/>
-                    <TextBlock Text="支持 512–65536 MiB，请根据电脑的实际可用内存设置。"
+                    <TextBlock Text="{loc:Loc '支持 512–65536 MiB，请根据电脑的实际可用内存设置。'}"
                                Style="{StaticResource CaptionStyle}" />
-                    <TextBlock Text="开启自动分配后，上方数值仅保留为手动配置；自动模式为系统预留至少 2 GiB，并限制为物理内存的一半、最高 12 GiB。" Style="{StaticResource CaptionStyle}" FontSize="12"/>
-                    <Label Content="Microsoft 应用 Client ID（可留空）" Target="{Binding ElementName=ClientIdInput}" Margin="0,12,0,0" />
+                    <TextBlock Text="{loc:Loc '开启自动分配后，上方数值仅保留为手动配置；自动模式为系统预留至少 2 GiB，并限制为物理内存的一半、最高 12 GiB。'}" Style="{StaticResource CaptionStyle}" FontSize="12"/>
+                    <Label Content="{loc:Loc 'Microsoft 应用 Client ID（可留空）'}" Target="{Binding ElementName=ClientIdInput}" Margin="0,12,0,0" />
                     <TextBox x:Name="ClientIdInput" Text="{Binding MicrosoftClientId, UpdateSourceTrigger=PropertyChanged}" />
-                    <TextBlock Text="正版登录使用公开桌面应用与 PKCE，无需 Client Secret。留空仍可使用离线模式。"
+                    <TextBlock Text="{loc:Loc '正版登录使用公开桌面应用与 PKCE，无需 Client Secret。留空仍可使用离线模式。'}"
                                Style="{StaticResource CaptionStyle}" />
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardStyle}">
                 <StackPanel IsEnabled="{Binding CanEdit}">
-                    <TextBlock Text="游戏窗口与运行环境" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,20"/>
-                    <Label Content="游戏窗口类型"/>
-                    <ComboBox ItemsSource="{Binding WindowModes}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding WindowMode}"/>
+                    <TextBlock Text="{loc:Loc '游戏窗口与运行环境'}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,20"/>
+                    <Label Content="{loc:Loc '游戏窗口类型'}"/>
+                    <ComboBox ItemsSource="{Binding WindowModes}" ItemTemplate="{DynamicResource LocalizedChoiceTemplate}" SelectedValuePath="Value" SelectedValue="{Binding WindowMode}"/>
                     <Grid Margin="0,0,0,18">
                         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="20"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <StackPanel><Label Content="窗口宽度（像素）"/><TextBox Text="{Binding WindowWidth, UpdateSourceTrigger=PropertyChanged}" Margin="0"/></StackPanel>
-                        <StackPanel Grid.Column="2"><Label Content="窗口高度（像素）"/><TextBox Text="{Binding WindowHeight, UpdateSourceTrigger=PropertyChanged}" Margin="0"/></StackPanel>
+                        <StackPanel><Label Content="{loc:Loc '窗口宽度（像素）'}"/><TextBox Text="{Binding WindowWidth, UpdateSourceTrigger=PropertyChanged}" Margin="0"/></StackPanel>
+                        <StackPanel Grid.Column="2"><Label Content="{loc:Loc '窗口高度（像素）'}"/><TextBox Text="{Binding WindowHeight, UpdateSourceTrigger=PropertyChanged}" Margin="0"/></StackPanel>
                     </Grid>
-                    <CheckBox Content="按版本隔离存档、模组、截图和游戏设置" IsChecked="{Binding IsolateVersions}" Margin="0,0,0,12"/>
-                    <TextBlock Text="隔离目录为 游戏根目录/instances/版本ID；依赖和资源仍共享。切换模式不会迁移或删除已有存档。" Style="{StaticResource CaptionStyle}" FontSize="12"/>
-                    <Label Content="游戏进程优先级" Margin="0,12,0,0"/>
-                    <ComboBox ItemsSource="{Binding Priorities}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding ProcessPriority}"/>
-                    <Label Content="自动切换游戏语言"/>
-                    <ComboBox ItemsSource="{Binding Languages}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Language}"/>
-                    <TextBlock Text="在实际启动目录更新 options.txt，并保留最近一次修改前备份；不支持的系统语言使用 English。旧版游戏的语言标识可能不同。" Style="{StaticResource CaptionStyle}" FontSize="12"/>
+                    <CheckBox Content="{loc:Loc '按版本隔离存档、模组、截图和游戏设置'}" IsChecked="{Binding IsolateVersions}" Margin="0,0,0,12"/>
+                    <TextBlock Text="{loc:Loc '隔离目录为 游戏根目录/instances/版本ID；依赖和资源仍共享。切换模式不会迁移或删除已有存档。'}" Style="{StaticResource CaptionStyle}" FontSize="12"/>
+                    <Label Content="{loc:Loc '游戏进程优先级'}" Margin="0,12,0,0"/>
+                    <ComboBox ItemsSource="{Binding Priorities}" ItemTemplate="{DynamicResource LocalizedChoiceTemplate}" SelectedValuePath="Value" SelectedValue="{Binding ProcessPriority}"/>
+                    <Label Content="{loc:Loc '自动切换游戏语言'}"/>
+                    <ComboBox ItemsSource="{Binding Languages}" ItemTemplate="{DynamicResource LocalizedChoiceTemplate}" SelectedValuePath="Value" SelectedValue="{Binding Language}"/>
+                    <TextBlock Text="{loc:Loc '在实际启动目录更新 options.txt，并保留最近一次修改前备份；不支持的系统语言使用 English。旧版游戏的语言标识可能不同。'}" Style="{StaticResource CaptionStyle}" FontSize="12"/>
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardStyle}">
                 <StackPanel IsEnabled="{Binding CanEdit}">
-                    <TextBlock Text="高级参数与界面" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,20"/>
-                    <Label Content="额外 JVM 参数"/>
-                    <TextBox Text="{Binding ExtraJvmArguments, UpdateSourceTrigger=PropertyChanged}" MaxLength="8192" ToolTip="例如 -XX:+UseG1GC；不要重复填写 -Xmx、-Xms 或 classpath"/>
-                    <Label Content="额外游戏参数"/>
-                    <TextBox Text="{Binding ExtraGameArguments, UpdateSourceTrigger=PropertyChanged}" MaxLength="8192" ToolTip="用双引号包裹含空格的参数；账户、目录与窗口参数由启动器管理"/>
-                    <TextBlock Text="参数直接传给 Java，不经过命令行外壳。请仅使用适用于所选游戏版本和 Java 的参数。" Style="{StaticResource CaptionStyle}" FontSize="12"/>
-                    <CheckBox Content="启用页面过渡与启动器动画（同时遵循 Windows 动画设置）" IsChecked="{Binding EnableAnimations}" Margin="0,12,0,0"/>
+                    <TextBlock Text="{loc:Loc '高级参数与界面'}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,20"/>
+                    <Label Content="{loc:Loc '额外 JVM 参数'}"/>
+                    <TextBox Text="{Binding ExtraJvmArguments, UpdateSourceTrigger=PropertyChanged}" MaxLength="8192" ToolTip="{loc:Loc '例如 -XX:+UseG1GC；不要重复填写 -Xmx、-Xms 或 classpath'}"/>
+                    <Label Content="{loc:Loc '额外游戏参数'}"/>
+                    <TextBox Text="{Binding ExtraGameArguments, UpdateSourceTrigger=PropertyChanged}" MaxLength="8192" ToolTip="{loc:Loc '用双引号包裹含空格的参数；账户、目录与窗口参数由启动器管理'}"/>
+                    <TextBlock Text="{loc:Loc '参数直接传给 Java，不经过命令行外壳。请仅使用适用于所选游戏版本和 Java 的参数。'}" Style="{StaticResource CaptionStyle}" FontSize="12"/>
+                    <CheckBox Content="{loc:Loc '启用页面过渡与启动器动画（同时遵循 Windows 动画设置）'}" IsChecked="{Binding EnableAnimations}" Margin="0,12,0,0"/>
                 </StackPanel>
             </Border>
             <WrapPanel Margin="0,0,0,20">
-                <Button Content="保存设置" Command="{Binding SaveCommand}"
+                <Button Content="{loc:Loc '保存设置'}" Command="{Binding SaveCommand}"
                         Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,12,0" />
-                <Button Content="重新读取" Command="{Binding LoadCommand}"
-                        ToolTip="重新读取磁盘配置，放弃尚未保存的修改" Margin="0,0,12,8"/>
-                <Button Content="恢复默认草稿" Command="{Binding ResetDefaultsCommand}" Margin="0,0,12,8"/>
-                <Button Content="查看协议与免责声明" Command="{Binding ShowLegalDocumentsCommand}" Margin="0,0,0,8"/>
+                <Button Content="{loc:Loc '重新读取'}" Command="{Binding LoadCommand}"
+                        ToolTip="{loc:Loc '重新读取磁盘配置，放弃尚未保存的修改'}" Margin="0,0,12,8"/>
+                <Button Content="{loc:Loc '恢复默认草稿'}" Command="{Binding ResetDefaultsCommand}" Margin="0,0,12,8"/>
+                <Button Content="{loc:Loc '查看协议与免责声明'}" Command="{Binding ShowLegalDocumentsCommand}" Margin="0,0,0,8"/>
             </WrapPanel>
-            <TextBlock Text="{Binding StatusMessage}" AutomationProperties.LiveSetting="Polite" Margin="0,0,0,20">
+            <TextBlock Text="{loc:Translate {Binding StatusMessage}}" AutomationProperties.LiveSetting="Polite" Margin="0,0,0,20">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                         <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
@@ -78,8 +94,8 @@
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
-            <TextBlock Text="配置文件" Style="{StaticResource CaptionStyle}" />
-            <TextBlock Text="{Binding SettingsFilePath}" Style="{StaticResource CaptionStyle}" FontSize="12" />
+            <TextBlock Text="{loc:Loc '配置文件'}" Style="{StaticResource CaptionStyle}" />
+            <TextBlock Text="{loc:Translate {Binding SettingsFilePath}}" Style="{StaticResource CaptionStyle}" FontSize="12" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

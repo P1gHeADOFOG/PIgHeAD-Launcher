@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.IO;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PIgHeAD.Launcher.Models;
@@ -36,6 +37,22 @@ public partial class SettingsViewModel : ObservableObject
 
     public string SettingsFilePath => settingsService.SettingsFilePath;
     public string VersionDisplay => LauncherVersion.Display;
+    public ObservableCollection<GameDirectoryEntry> GameDirectories { get; } = [];
+    [ObservableProperty] public partial GameDirectoryEntry? SelectedGameDirectory { get; set; }
+    partial void OnSelectedGameDirectoryChanged(GameDirectoryEntry? value) => SwitchGameDirectoryCommand.NotifyCanExecuteChanged();
+    public string GameDataDirectory => SavedSettings is { } saved
+        ? Services.Settings.LauncherPaths.GetGameDataDirectory(saved.GameDirectory) : "";
+
+    private void UpdateGameDirectories()
+    {
+        var all = (settingsService as IGameLibrarySettingsService)?.GameDirectories
+            ?? (SavedSettings is { } saved ? [saved.GameDirectory] : Array.Empty<string>());
+        GameDirectories.Clear();
+        foreach (var path in all) GameDirectories.Add(new GameDirectoryEntry(path));
+        SelectedGameDirectory = GameDirectories.FirstOrDefault(item =>
+            item.DirectoryPath.Equals(SavedSettings?.GameDirectory, StringComparison.OrdinalIgnoreCase));
+        OnPropertyChanged(nameof(GameDataDirectory));
+    }
 
     [ObservableProperty]
     public partial string GameDirectory { get; set; } = string.Empty;
@@ -75,6 +92,7 @@ public partial class SettingsViewModel : ObservableObject
         ResetDefaultsCommand.NotifyCanExecuteChanged();
         BrowseDirectoryCommand.NotifyCanExecuteChanged();
         BrowseJavaCommand.NotifyCanExecuteChanged();
+        SwitchGameDirectoryCommand.NotifyCanExecuteChanged();
     }
 
     [ObservableProperty]
@@ -129,7 +147,7 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void ResetDefaults()
     {
-        LoadDraft(new LauncherSettings());
+        LoadDraft(new LauncherSettings { GameDirectory = SavedSettings?.GameDirectory ?? new LauncherSettings().GameDirectory });
         StatusMessage = "已恢复默认草稿；点击保存后生效。原游戏文件不会移动或删除。";
         HasError = false;
     }
@@ -158,6 +176,7 @@ public partial class SettingsViewModel : ObservableObject
             var result = await settingsService.LoadAsync(cancellationToken);
             LoadDraft(result.Settings);
             SavedSettings = result.Settings;
+            UpdateGameDirectories();
             IsLoaded = true;
             HasError = result.BackupFilePath is not null;
             StatusMessage = result.BackupFilePath is null
@@ -217,6 +236,7 @@ public partial class SettingsViewModel : ObservableObject
             GameDirectory = settings.GameDirectory;
             JavaPath = settings.JavaPath;
             SavedSettings = settings;
+            UpdateGameDirectories();
             StatusMessage = "设置已保存。";
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -238,11 +258,42 @@ public partial class SettingsViewModel : ObservableObject
     {
         if (SavedSettings is null) throw new InvalidOperationException("请先读取启动器设置。");
         // Preserve the user's unsaved form; only the saved active game root changes here.
-        var updated = SavedSettings with { GameDirectory = result.GameDirectory, PreferredVersionId = result.SelectedVersionId };
+        var profile = settingsService is IGameLibrarySettingsService library
+            ? await library.LoadGameAsync(result.GameDirectory, cancellationToken) : SavedSettings;
+        var updated = profile with { GameDirectory = result.GameDirectory, PreferredVersionId = result.SelectedVersionId };
         updated.Validate();
         await settingsService.SaveAsync(updated, cancellationToken);
         GameDirectory = updated.GameDirectory;
         SavedSettings = updated;
+        UpdateGameDirectories();
         StatusMessage = "已启用导入的游戏目录；其他设置草稿保持不变。";
+    }
+
+    public bool CanSwitchGameDirectory => CanEdit && settingsService is IGameLibrarySettingsService
+        && SelectedGameDirectory is not null;
+    private bool CanSwitch() => CanSwitchGameDirectory;
+
+    [RelayCommand(CanExecute = nameof(CanSwitch))]
+    private async Task SwitchGameDirectoryAsync(CancellationToken cancellationToken)
+    {
+        if (settingsService is not IGameLibrarySettingsService library || SelectedGameDirectory is not { } selected) return;
+        IsBusy = true;
+        HasError = false;
+        try
+        {
+            var profile = await library.LoadGameAsync(selected.DirectoryPath, cancellationToken);
+            await library.SaveAsync(profile, cancellationToken);
+            LoadDraft(profile);
+            SavedSettings = profile;
+            UpdateGameDirectories();
+            StatusMessage = "已切换游戏目录，并读取该目录 PHL 中的设置。";
+        }
+        catch (OperationCanceledException) { StatusMessage = "切换已取消。"; }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ValidationException)
+        {
+            HasError = true;
+            StatusMessage = "切换失败：" + exception.Message;
+        }
+        finally { IsBusy = false; }
     }
 }

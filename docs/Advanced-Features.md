@@ -2,7 +2,7 @@
 
 ## 首次启动
 
-程序在显示主窗口、恢复账户或读取游戏列表之前，检查当前 Windows 用户的 `%LOCALAPPDATA%\PIgHeAD\Launcher\consent.json`。
+程序在显示主窗口、恢复账户或读取游戏列表之前，检查启动器旁的 `PHL\consent.json`。协议窗口可切换中英文，内容校验覆盖两种语言。
 
 - 没有有效记录时，显示内嵌的 [用户协议（草案）](User-Agreement.md) 和 [免责声明与隐私说明（草案）](Disclaimer.md)。发布者为 **PIgHeAD_OFOG**，联系邮箱 **p1gheadofog@gmail.com**。
 - 两个复选框默认不勾选；必须分别同意并成功保存，才进入启动器。拒绝或关闭则退出。
@@ -33,9 +33,9 @@
 ## 下载中心
 
 1. 在 Settings 保存游戏根目录；首次读取列表不会下载游戏文件。
-2. 进入 Downloads，点击“读取 Minecraft 列表”，选择正式原版版本。
-3. 选择组件。Forge、NeoForge、Fabric、Quilt 再点击“读取兼容构建”，选择一个构建；稳定版优先展示，Forge 优先展示推荐版。
-4. 点击“安装所选版本”。共享任务状态会禁用冲突的启动、安装、账户切换与设置保存。成功后刷新 Versions 并选中安装的版本。
+2. 进入 Downloads，启动时已自动读取正式原版版本；最近 6 个版本可直接点击版本号下载安装，更多版本在下拉框选择。
+3. 选择组件。Forge、NeoForge、Fabric、Quilt 自动读取兼容构建，选择一个构建；稳定版优先展示，Forge 优先展示推荐版。网络失败时显示重试入口。
+4. 点击“下载并安装”。共享任务状态会禁用冲突的启动、安装、账户切换与设置保存。成功后刷新 Versions 并选中安装的版本。
 5. 当前任务可取消；等待操作实际结束后解锁。已完成的文件保留，重试同一版本时检查并补全。任务记录仅在本次会话保留，最多 30 条。部分版本元数据存在不代表安装完整，失败后不要把“本地”标记当作成功证明。
 
 | 组件 | 当前入口 | 来源与边界 |
@@ -55,6 +55,16 @@ OptiFine 使用步骤：先安装对应原版，在 Settings 选择可用的 Jav
 
 ## 架构与验证
 
+### 本地版本详情与模组
+
+Versions 仅列出本地安装，不再提供在线版本列表或直接安装按钮；“前往下载中心”跳转到 Downloads。本地列表每一行提供“详情”和“删除”。
+
+详情读取本地版本 JSON 及其继承链，显示 Minecraft 版本、加载器及版本号、Java 要求、版本类型、发布时间、版本目录大小、游戏根目录和实际运行目录；缺少的信息明确标为未声明。体积只统计所选版本目录，不代表整个游戏与共享资源的大小。
+
+“查看模组”以本地版本元数据中的 Forge / NeoForge / Fabric / Quilt 加载器作为模组支持依据；纯原版不显示入口，不根据文件夹名称猜测。读取实际运行目录的 `mods` 中启用的 `.jar` 文件，遵循共享目录、版本隔离及导入实例布局。支持 `fabric.mod.json`、`quilt.mod.json`、`META-INF/mods.toml`、`META-INF/neoforge.mods.toml` 和旧版 `mcmod.info`，显示名称、ID、版本与文件名；无法识别或损坏的 JAR 显示文件名和读取状态。只读取压缩包资料，不执行 JAR，不需要外部模组服务的 API Key，也不验证实际兼容性。
+
+点击“删除”先展示具体版本目录及删除范围，确认后移入 Windows 回收站。目录内的 saves / mods / config 会一起移动；共享 libraries / assets、游戏根目录数据与独立 instances 目录不在删除范围。若其他版本直接继承此版本，会阻止删除并指出依赖版本。删除拒绝路径越界和链接；游戏运行、安装或其他冲突操作期间不能删除。自动化测试使用临时目录和模拟回收操作，不删除用户游戏。
+
 配置模型与参数校验在 Models；游戏环境和加载器适配在 Services/Minecraft；协议存储在 Services/Consent；系统选择器及浏览器入口通过 IDesktopService 隔离在 Services/Desktop。ViewModel 处理状态和命令，Views 负责绑定和纯界面动画。保留已有 IAccountService 与加密缓存模块，Microsoft API 审批仍按未获批处理。
 
 自动测试使用临时目录、模拟 HTTP、受控的 Java 替身，不运行真实 Minecraft、不执行外部 JAR，也不登录真实 Microsoft 账户。已实际读取 Minecraft 1.21.4 的 Forge、NeoForge、Fabric、Quilt 目录，并验证 Fabric / Quilt 选中稳定构建的 profile 继承目标；目录数量随服务更新变化。完整游戏下载、安装器处理器、实际窗口最大化、各版本模组兼容性仍需目标环境验收。
@@ -72,4 +82,4 @@ OptiFine 使用步骤：先安装对应原版，在 Settings 选择可用的 Jav
 | 测试 | `tests/PIgHeAD.Launcher.Tests/ProcessAndTokenTests.cs`、`WpfCompositionTests.cs`；新增 `ConsentAndEnvironmentTests.cs`、`DownloadCatalogTests.cs` |
 | 文档 | `README.md`、新增 `docs/User-Agreement.md`、`Disclaimer.md`、`Advanced-Features.md` |
 
-表中未重复完整路径的文件位于同一范围目录；本次未提交 Git commit，也未改写用户现有同意记录或设置。
+表中未重复完整路径的文件位于同一范围目录；测试不会改写用户现有同意记录或设置。当前版本与发布记录见 [beta v0.2.2 更新说明](Update-Notes-v0.2.2.md)。

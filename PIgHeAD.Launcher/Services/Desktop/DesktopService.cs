@@ -6,6 +6,7 @@ using PIgHeAD.Launcher.Services.Abstractions;
 using PIgHeAD.Launcher.Services.Consent;
 using PIgHeAD.Launcher.ViewModels;
 using PIgHeAD.Launcher.Views;
+using PIgHeAD.Launcher.Services.Presentation;
 
 namespace PIgHeAD.Launcher.Services.Desktop;
 
@@ -13,13 +14,14 @@ public sealed class DesktopService : IDesktopService
 {
     public string? SelectFolder(string initialDirectory)
     {
-        var dialog = new OpenFolderDialog { Title = "选择游戏根目录" };
+        var dialog = new OpenFolderDialog { Title = PresentationSettings.Current.Localize("选择游戏根目录") };
         if (Directory.Exists(initialDirectory)) dialog.InitialDirectory = initialDirectory;
         return dialog.ShowDialog(Application.Current.MainWindow) == true ? dialog.FolderName : null;
     }
     public string? SelectFile(string filter)
     {
-        var dialog = new OpenFileDialog { Filter = filter, CheckFileExists = true };
+        var dialog = new OpenFileDialog { Filter = string.Join('|', filter.Split('|').Select((part, index) =>
+            index % 2 == 0 ? PresentationSettings.Current.Localize(part) : part)), CheckFileExists = true };
         return dialog.ShowDialog(Application.Current.MainWindow) == true ? dialog.FileName : null;
     }
     public void OpenWebsite(string address)

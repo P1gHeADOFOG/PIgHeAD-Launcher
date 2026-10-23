@@ -10,11 +10,17 @@ public static class GameEnvironment
     public static string GetWorkingDirectory(LauncherSettings settings, string versionId)
     {
         var root = GameRootLocator.Resolve(settings.GameDirectory);
-        if (ImportedGameLayout.GetWorkingDirectory(root, versionId) is { } imported) return imported;
-        if (!settings.IsolateVersions) return Path.GetFullPath(root);
         if (string.IsNullOrWhiteSpace(versionId) || versionId is "." or ".."
             || versionId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
             throw new InvalidOperationException("版本名称不能用作隔离目录。");
+        if (ImportedGameLayout.GetWorkingDirectory(root, versionId) is { } imported) return imported;
+        foreach (var prefix in new[] { "versions", "instances" })
+        {
+            var candidate = SafeGamePath.Resolve(root, prefix + "/" + versionId);
+            if (new[] { "mods", "config", "saves", "resourcepacks" }.Any(name => Directory.Exists(Path.Combine(candidate, name))))
+                return candidate;
+        }
+        if (!settings.IsolateVersions) return Path.GetFullPath(root);
         return Path.Combine(Path.GetFullPath(root), "instances", versionId);
     }
 

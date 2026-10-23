@@ -12,6 +12,7 @@ using CmlLib.Core.VersionLoader;
 using CmlLib.Core.VersionMetadata;
 using PIgHeAD.Launcher.Models;
 using PIgHeAD.Launcher.Services.Abstractions;
+using PIgHeAD.Launcher.Services.Settings;
 
 namespace PIgHeAD.Launcher.Services.Minecraft;
 
@@ -71,7 +72,7 @@ public sealed class MinecraftGameService(string? gameLogDirectory = null) : IGam
         }
         progress.Report(new GameProgress("检查 Java 与启动环境…"));
         var version = await launcher.GetVersionAsync(request.Version.Id, cancellationToken).ConfigureAwait(false);
-        var java = ResolveJava(request.Settings.JavaPath, launcher, version);
+        var java = ResolveJava(request.Settings.JavaPath, request.Settings.GameDirectory, launcher, version);
         var required = version.GetInheritedProperty(v => v.JavaVersion)?.MajorVersion;
         var minimumMajor = int.TryParse(required, out var parsed) ? parsed : 8;
         var major = await JavaRuntimeProbe.CheckAsync(java, minimumMajor, cancellationToken).ConfigureAwait(false);
@@ -102,8 +103,7 @@ public sealed class MinecraftGameService(string? gameLogDirectory = null) : IGam
         process.StartInfo.CreateNoWindow = true;
         process.StartInfo.RedirectStandardOutput = true;
         process.StartInfo.RedirectStandardError = true;
-        var logDirectory = gameLogDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "PIgHeAD", "Launcher", "logs");
+        var logDirectory = gameLogDirectory ?? Path.Combine(LauncherPaths.GetGameDataDirectory(request.Settings.GameDirectory), "logs");
         Directory.CreateDirectory(logDirectory);
         var logPath = Path.Combine(logDirectory, $"game-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.log");
         var log = new StreamWriter(new FileStream(logPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read));
@@ -161,13 +161,17 @@ public sealed class MinecraftGameService(string? gameLogDirectory = null) : IGam
         progress.Report(new GameProgress("文件准备完成", 100));
     }
 
-    private static string ResolveJava(string configured, MinecraftLauncher launcher, IVersion version)
+    private static string ResolveJava(string configured, string gameDirectory, MinecraftLauncher launcher, IVersion version)
     {
         if (!string.IsNullOrWhiteSpace(configured))
         {
             return configured;
         }
-        var candidates = new List<string?> { launcher.GetJavaPath(version), launcher.GetDefaultJavaPath() };
+        var required = version.GetInheritedProperty(v => v.JavaVersion)?.MajorVersion;
+        var minimumMajor = int.TryParse(required, out var major) ? major : 8;
+        var candidates = new List<string?>(LocalJavaLocator.FindCandidates(gameDirectory,
+            AppContext.BaseDirectory, minimumMajor));
+        candidates.AddRange([launcher.GetJavaPath(version), launcher.GetDefaultJavaPath()]);
         var javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
         if (!string.IsNullOrEmpty(javaHome))
         {

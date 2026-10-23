@@ -12,7 +12,7 @@ using XboxAuthNet.Game.Msal.OAuth;
 
 namespace PIgHeAD.Launcher.Services.Accounts;
 
-public sealed class MicrosoftAccountService : IAccountService
+public sealed class MicrosoftAccountService(string? authDirectory = null) : IAccountService
 {
     private static readonly string[] Scopes = ["XboxLive.signin"];
     private IPublicClientApplication? application;
@@ -92,9 +92,9 @@ public sealed class MicrosoftAccountService : IAccountService
         {
             return application;
         }
-        var cache = new ProtectedTokenCache(Path.Combine(
+        var cache = new ProtectedTokenCache(Path.Combine(authDirectory ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "PIgHeAD", "Launcher", "auth", normalizedId + ".bin"));
+            "PIgHeAD", "Launcher", "auth"), normalizedId + ".bin"));
         var app = PublicClientApplicationBuilder.Create(normalizedId)
             .WithAuthority(AzureCloudInstance.AzurePublic, "consumers")
             .WithRedirectUri("http://localhost")

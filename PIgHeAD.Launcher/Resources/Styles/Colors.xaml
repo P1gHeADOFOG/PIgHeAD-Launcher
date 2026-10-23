@@ -14,4 +14,8 @@
     <SolidColorBrush x:Key="SuccessBrush" Color="#9DD4B6" />
     <SolidColorBrush x:Key="SuccessTintBrush" Color="#21352D" />
     <SolidColorBrush x:Key="ErrorBrush" Color="#FFB4A8" />
+    <SolidColorBrush x:Key="HeroTextBrush" Color="#F2F4F8" />
+    <Color x:Key="HeroOverlayStart">#F51B242D</Color>
+    <Color x:Key="HeroOverlayMiddle">#DC1B242D</Color>
+    <SolidColorBrush x:Key="HeroSecondaryTextBrush" Color="#D2DEDA"/>
 </ResourceDictionary>

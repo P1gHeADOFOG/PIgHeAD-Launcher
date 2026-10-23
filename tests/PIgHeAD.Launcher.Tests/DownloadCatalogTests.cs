@@ -10,6 +10,99 @@ namespace PIgHeAD.Launcher.Tests;
 
 public sealed class DownloadCatalogTests
 {
+    [Fact]
+    public async Task StartupPreloadsCatalogAndSelectingLoaderAutomaticallyFindsBuilds()
+    {
+        var context = new LauncherTestContext();
+        var loaders = new FakeLoader();
+        var catalog = new DownloadCatalogViewModel(context.GameService, loaders, new FakeDesktop(), context.Settings, context.Versions, context.Downloads);
+        context.Downloads.Catalog = catalog;
+        await context.Main.InitializeAsync(CancellationToken.None);
+        Assert.NotEmpty(catalog.MinecraftVersions);
+        Assert.True(catalog.InstallCommand.CanExecute(null));
+        Assert.Empty(context.Downloads.History); // Loading metadata is not an installation task.
+        catalog.Component = DownloadComponent.Fabric;
+        await (catalog.LoadBuildsCommand.ExecutionTask ?? Task.CompletedTask);
+        Assert.NotNull(catalog.Build);
+        Assert.True(catalog.InstallCommand.CanExecute(null));
+        Assert.Equal(1, loaders.BuildCalls);
+        await catalog.EnsureLoadedAsync();
+        Assert.Equal(1, loaders.BuildCalls);
+        Assert.Equal(1, context.GameService.OnlineCatalogCalls);
+        catalog.Component = DownloadComponent.Vanilla;
+        await catalog.DownloadVersionCommand.ExecuteAsync(catalog.QuickVersions[0]);
+        Assert.Equal(catalog.QuickVersions[0].Id, context.GameService.LastInstalledVersion?.Id);
+        Assert.Contains(context.Downloads.History, item => item.Result.Contains("完成"));
+    }
+
+    [Fact]
+    public async Task FailedAutomaticCatalogCanRetryWithoutBlockingLocalLaunch()
+    {
+        var context = new LauncherTestContext();
+        context.GameService.CatalogError = new HttpRequestException("offline");
+        var catalog = new DownloadCatalogViewModel(context.GameService, new FakeLoader(), new FakeDesktop(), context.Settings, context.Versions, context.Downloads);
+        context.Downloads.Catalog = catalog;
+        await context.Main.InitializeAsync(CancellationToken.None);
+        Assert.Empty(catalog.MinecraftVersions);
+        Assert.Contains("offline", catalog.Status);
+        Assert.False(catalog.IsLoading);
+        Assert.True(context.Home.LaunchGameCommand.CanExecute(null));
+        Assert.True(catalog.LoadMinecraftCommand.CanExecute(null));
+        context.GameService.CatalogError = null;
+        await catalog.EnsureLoadedAsync();
+        Assert.NotEmpty(catalog.MinecraftVersions);
+        Assert.Equal(2, context.GameService.OnlineCatalogCalls);
+    }
+
+    [Fact]
+    public async Task SlowCatalogDoesNotLockLocalGameAndShutdownCancelsWithoutNewBuildRequests()
+    {
+        var context = new LauncherTestContext();
+        context.GameService.PendingCatalog = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loaders = new FakeLoader();
+        var catalog = new DownloadCatalogViewModel(context.GameService, loaders, new FakeDesktop(), context.Settings, context.Versions, context.Downloads);
+        context.Downloads.Catalog = catalog;
+        catalog.Component = DownloadComponent.Fabric;
+        var initialization = context.Main.InitializeAsync(CancellationToken.None);
+        Assert.True(catalog.IsLoading);
+        Assert.True(context.Home.LaunchGameCommand.CanExecute(null));
+        context.Main.CancelPendingOperations();
+        await initialization.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.False(catalog.IsLoading);
+        Assert.Equal(0, loaders.BuildCalls);
+    }
+
+    [Fact]
+    public async Task SwitchingLoaderRejectsStaleResponseAndLoadsCurrentSelection()
+    {
+        var context = new LauncherTestContext();
+        await context.Main.InitializeAsync(CancellationToken.None);
+        var stale = new TaskCompletionSource<IReadOnlyList<LoaderBuild>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var latestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loaders = new FakeLoader
+        {
+            Fetch = (component, _) =>
+            {
+                if (component == DownloadComponent.Fabric) return stale.Task; // Simulate a server ignoring cancellation.
+                latestStarted.TrySetResult();
+                return Task.FromResult<IReadOnlyList<LoaderBuild>>([new("quilt-build", "quilt-build")]);
+            }
+        };
+        var catalog = new DownloadCatalogViewModel(context.GameService, loaders, new FakeDesktop(), context.Settings, context.Versions, context.Downloads);
+        await catalog.EnsureLoadedAsync();
+        catalog.Component = DownloadComponent.Fabric;
+        Assert.True(catalog.IsLoading);
+        Assert.True(context.Downloads.IsIdle);
+        Assert.False(catalog.InstallCommand.CanExecute(null));
+        catalog.Component = DownloadComponent.Quilt;
+        stale.SetResult([new("obsolete-fabric", "obsolete-fabric")]);
+        await latestStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        await catalog.LoadBuildsCommand.ExecutionTask!;
+        Assert.Equal("quilt-build", catalog.Build?.Id);
+        Assert.DoesNotContain(catalog.Builds, item => item.Id == "obsolete-fabric");
+        Assert.False(catalog.IsLoading);
+    }
+
     [Theory]
     [InlineData(DownloadComponent.Fabric, "https://meta.fabricmc.net/v2/versions/loader/1.21.4")]
     [InlineData(DownloadComponent.Quilt, "https://meta.quiltmc.org/v3/versions/loader/1.21.4")]
@@ -127,11 +220,16 @@ public sealed class DownloadCatalogTests
     }
     private sealed class FakeLoader : ILoaderService
     {
+        public int BuildCalls { get; private set; }
+        public Func<DownloadComponent, CancellationToken, Task<IReadOnlyList<LoaderBuild>>>? Fetch { get; init; }
         public bool WaitForCancellation { get; set; }
         public Exception? Error { get; init; }
         public int InstallCalls { get; private set; }
-        public Task<IReadOnlyList<LoaderBuild>> GetBuildsAsync(DownloadComponent component, string minecraft, CancellationToken token) =>
-            Task.FromResult<IReadOnlyList<LoaderBuild>>([new("test-build", "test-build")]);
+        public Task<IReadOnlyList<LoaderBuild>> GetBuildsAsync(DownloadComponent component, string minecraft, CancellationToken token)
+        {
+            BuildCalls++;
+            return Fetch?.Invoke(component, token) ?? Task.FromResult<IReadOnlyList<LoaderBuild>>([new("test-build", "test-build")]);
+        }
         public async Task<string> InstallAsync(LauncherSettings settings, DownloadComponent component, string minecraft,
             LoaderBuild build, IProgress<GameProgress> progress, CancellationToken token)
         {

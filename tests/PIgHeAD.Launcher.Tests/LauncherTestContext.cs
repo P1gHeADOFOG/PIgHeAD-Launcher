@@ -40,16 +40,31 @@ internal sealed class LauncherTestContext
         public bool WaitForCancellation { get; set; }
         public Task<int> Exit { get; set; } = Task.FromResult(0);
         public Exception? InstallError { get; set; }
+        public Exception? CatalogError { get; set; }
+        public TaskCompletionSource<IReadOnlyList<GameVersionInfo>>? PendingCatalog { get; set; }
+        public int OnlineCatalogCalls { get; private set; }
+        public GameVersionInfo? LastInstalledVersion { get; private set; }
         public int RepairCalls { get; private set; }
         public Task RepairAsync(LauncherSettings settings, GameVersionInfo version, IProgress<GameProgress> progress, CancellationToken token)
         {
             RepairCalls++;
             return InstallAsync(settings, version, progress, token);
         }
-        public Task<IReadOnlyList<GameVersionInfo>> GetVersionsAsync(string directory, bool includeOnline, CancellationToken token) =>
-            Task.FromResult<IReadOnlyList<GameVersionInfo>>([new("1.21.4", "release", true)]);
-        public Task InstallAsync(LauncherSettings settings, GameVersionInfo version, IProgress<GameProgress> progress, CancellationToken token) =>
-            InstallError is null ? Task.CompletedTask : Task.FromException(InstallError);
+        public Task<IReadOnlyList<GameVersionInfo>> GetVersionsAsync(string directory, bool includeOnline, CancellationToken token)
+        {
+            if (includeOnline)
+            {
+                OnlineCatalogCalls++;
+                if (CatalogError is not null) return Task.FromException<IReadOnlyList<GameVersionInfo>>(CatalogError);
+                if (PendingCatalog is not null) return PendingCatalog.Task.WaitAsync(token);
+            }
+            return Task.FromResult<IReadOnlyList<GameVersionInfo>>([new("1.21.4", "release", true)]);
+        }
+        public Task InstallAsync(LauncherSettings settings, GameVersionInfo version, IProgress<GameProgress> progress, CancellationToken token)
+        {
+            LastInstalledVersion = version;
+            return InstallError is null ? Task.CompletedTask : Task.FromException(InstallError);
+        }
         public async Task<GameLaunchResult> LaunchAsync(GameLaunchRequest request, IProgress<GameProgress> progress, CancellationToken token)
         {
             LaunchCalls++;

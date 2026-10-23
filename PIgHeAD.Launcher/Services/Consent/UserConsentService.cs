@@ -7,11 +7,13 @@ namespace PIgHeAD.Launcher.Services.Consent;
 
 public sealed class UserConsentService
 {
-    public const string Revision = "2026-10-21-v1";
+    public const string Revision = "2026-10-21-v2";
     public static string AgreementText { get; } = ReadDocument("PIgHeAD.UserAgreement.md");
     public static string DisclaimerText { get; } = ReadDocument("PIgHeAD.Disclaimer.md");
+    public static string AgreementEnglishText { get; } = ReadDocument("PIgHeAD.UserAgreement.en.md");
+    public static string DisclaimerEnglishText { get; } = ReadDocument("PIgHeAD.Disclaimer.en.md");
     public static string ContentHash { get; } = Convert.ToHexString(SHA256.HashData(
-        Encoding.UTF8.GetBytes(AgreementText + "\n" + DisclaimerText)));
+        Encoding.UTF8.GetBytes(AgreementText + "\n" + DisclaimerText + "\n" + AgreementEnglishText + "\n" + DisclaimerEnglishText)));
     private readonly string path;
 
     public UserConsentService(string? path = null) => this.path = path ?? Path.Combine(

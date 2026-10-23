@@ -15,6 +15,9 @@ public partial class DownloadCatalogViewModel : ObservableObject
     private readonly SettingsViewModel settings;
     private readonly VersionsViewModel versions;
     private readonly DownloadsViewModel downloads;
+    private Task? initialLoad;
+    private bool automaticLoading;
+    private int selectionGeneration;
     public DownloadCatalogViewModel(IGameService games, ILoaderService loaders, IDesktopService desktop,
         SettingsViewModel settings, VersionsViewModel versions, DownloadsViewModel downloads)
     {
@@ -33,14 +36,22 @@ public partial class DownloadCatalogViewModel : ObservableObject
      new(DownloadComponent.Quilt, "Quilt"), new(DownloadComponent.NeoForge, "NeoForge"), new(DownloadComponent.OptiFine, "OptiFine HD")];
     public ObservableCollection<GameVersionInfo> MinecraftVersions { get; } = [];
     public ObservableCollection<LoaderBuild> Builds { get; } = [];
+    public IReadOnlyList<GameVersionInfo> QuickVersions => MinecraftVersions.Take(6).ToArray();
     [ObservableProperty] public partial DownloadComponent Component { get; set; }
     [ObservableProperty] public partial GameVersionInfo? MinecraftVersion { get; set; }
     [ObservableProperty] public partial LoaderBuild? Build { get; set; }
-    [ObservableProperty] public partial string Status { get; private set; } = "先读取官方 Minecraft 列表，再选择组件与兼容版本。各加载器分别安装，不会自动组合。";
+    [ObservableProperty] public partial bool IsCatalogLoading { get; private set; }
+    [ObservableProperty] public partial bool IsBuildsLoading { get; private set; }
+    public bool IsLoading => IsCatalogLoading || IsBuildsLoading;
+    public bool NeedsBuilds => Component is not (DownloadComponent.Vanilla or DownloadComponent.OptiFine);
+    [ObservableProperty] public partial string Status { get; private set; } = "正在准备版本列表…";
     public bool CanEdit => downloads.IsIdle && !settings.IsAccountOperationInProgress && !versions.IsLoading;
     private bool CanLoad() => CanEdit && settings.SavedSettings is not null;
-    private bool CanLoadBuilds() => CanLoad() && MinecraftVersion is not null && Component is not (DownloadComponent.Vanilla or DownloadComponent.OptiFine);
-    private bool CanInstall() => CanLoad() && MinecraftVersion is not null
+    private bool CanReadCatalog() => settings.SavedSettings is not null && downloads.IsIdle && !settings.IsBusy && !IsLoading;
+    private bool CanLoadBuilds() => settings.SavedSettings is not null && downloads.IsIdle && !IsLoading && MinecraftVersion is not null && Component is not (DownloadComponent.Vanilla or DownloadComponent.OptiFine);
+    public bool CanQuickInstall => CanLoad() && !IsLoading && Component == DownloadComponent.Vanilla;
+    private bool CanDownloadVersion(GameVersionInfo? version) => CanQuickInstall && version is not null;
+    private bool CanInstall() => CanLoad() && !IsLoading && MinecraftVersion is not null
         && (Component == DownloadComponent.Vanilla || (Component != DownloadComponent.OptiFine && Build is not null));
     private bool CanRunLocalInstaller() => CanLoad() && Component == DownloadComponent.OptiFine;
     public string ComponentDescription => Component switch
@@ -55,23 +66,68 @@ public partial class DownloadCatalogViewModel : ObservableObject
 
     partial void OnComponentChanged(DownloadComponent value)
     {
-        Builds.Clear(); Build = null; OnPropertyChanged(nameof(ComponentDescription)); NotifyCommands();
+        Builds.Clear(); Build = null; OnPropertyChanged(nameof(ComponentDescription)); OnPropertyChanged(nameof(NeedsBuilds)); NotifyCommands();
+        QueueCompatibleBuilds();
     }
-    partial void OnMinecraftVersionChanged(GameVersionInfo? value) { Builds.Clear(); Build = null; NotifyCommands(); }
+    partial void OnMinecraftVersionChanged(GameVersionInfo? value) { Builds.Clear(); Build = null; NotifyCommands(); QueueCompatibleBuilds(); }
     partial void OnBuildChanged(LoaderBuild? value) => NotifyCommands();
+    partial void OnIsCatalogLoadingChanged(bool value) { OnPropertyChanged(nameof(IsLoading)); NotifyCommands(); }
+    partial void OnIsBuildsLoadingChanged(bool value) { OnPropertyChanged(nameof(IsLoading)); NotifyCommands(); }
+
+    public Task EnsureLoadedAsync()
+    {
+        automaticLoading = true;
+        if (MinecraftVersions.Count > 0 || !CanReadCatalog()) return initialLoad ?? Task.CompletedTask;
+        if (initialLoad is { IsCompleted: false }) return initialLoad;
+        return initialLoad = LoadMinecraftCommand.ExecuteAsync(null);
+    }
+
+    public void CancelPendingOperations()
+    {
+        automaticLoading = false;
+        selectionGeneration++;
+        LoadMinecraftCommand.Cancel();
+        LoadBuildsCommand.Cancel();
+        InstallCommand.Cancel();
+        DownloadVersionCommand.Cancel();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDownloadVersion))]
+    private async Task DownloadVersionAsync(GameVersionInfo version, CancellationToken cancellationToken)
+    {
+        MinecraftVersion = version;
+        using var registration = cancellationToken.Register(InstallCommand.Cancel);
+        if (InstallCommand.CanExecute(null)) await InstallCommand.ExecuteAsync(null);
+    }
+
+    private void QueueCompatibleBuilds()
+    {
+        var generation = ++selectionGeneration;
+        LoadBuildsCommand.Cancel();
+        if (automaticLoading && !IsCatalogLoading) _ = LoadCompatibleSelectionAsync(generation);
+    }
+
+    private async Task LoadCompatibleSelectionAsync(int generation)
+    {
+        if (LoadBuildsCommand.ExecutionTask is { IsCompleted: false } pending) await pending;
+        if (generation == selectionGeneration && CanLoadBuilds()) await LoadBuildsCommand.ExecuteAsync(null);
+    }
 
     private void NotifyCommands()
     {
         OnPropertyChanged(nameof(CanEdit));
+        OnPropertyChanged(nameof(CanQuickInstall));
+        DownloadVersionCommand.NotifyCanExecuteChanged();
         LoadMinecraftCommand.NotifyCanExecuteChanged(); LoadBuildsCommand.NotifyCanExecuteChanged();
         InstallCommand.NotifyCanExecuteChanged(); RunOptiFineInstallerCommand.NotifyCanExecuteChanged();
     }
 
-    [RelayCommand(CanExecute = nameof(CanLoad), IncludeCancelCommand = true)]
+    [RelayCommand(CanExecute = nameof(CanReadCatalog), IncludeCancelCommand = true)]
     private async Task LoadMinecraftAsync(CancellationToken cancellationToken)
     {
         var snapshot = settings.SavedSettings!;
-        downloads.Begin("读取官方 Minecraft 列表", LoadMinecraftCommand.Cancel);
+        IsCatalogLoading = true;
+        Status = "正在读取官方 Minecraft 列表…";
         try
         {
             var items = await games.GetVersionsAsync(snapshot.GameDirectory, true, cancellationToken);
@@ -79,12 +135,14 @@ public partial class DownloadCatalogViewModel : ObservableObject
             MinecraftVersions.Clear();
             foreach (var item in items.Where(v => v.Type == "release" && Regex.IsMatch(v.Id, @"^\d+\.\d+(?:\.\d+)?$")))
                 MinecraftVersions.Add(item);
+            OnPropertyChanged(nameof(QuickVersions));
             MinecraftVersion = MinecraftVersions.FirstOrDefault(v => v.Id == selectedId) ?? MinecraftVersions.FirstOrDefault();
-            Status = $"已读取 {MinecraftVersions.Count} 个正式版本。选择组件后可读取对应构建。";
-            downloads.End(Status);
+            Status = $"已读取 {MinecraftVersions.Count} 个正式版本，可直接安装。";
         }
-        catch (OperationCanceledException) { Status = "版本列表读取已取消。"; downloads.End(Status); }
-        catch (Exception exception) { Status = "读取失败：" + exception.Message; downloads.End(Status); }
+        catch (OperationCanceledException) { Status = "版本列表读取已取消。"; }
+        catch (Exception exception) { Status = "读取失败：" + exception.Message; }
+        finally { IsCatalogLoading = false; }
+        if (automaticLoading && !cancellationToken.IsCancellationRequested) QueueCompatibleBuilds();
     }
 
     [RelayCommand(CanExecute = nameof(CanLoadBuilds), IncludeCancelCommand = true)]
@@ -92,18 +150,21 @@ public partial class DownloadCatalogViewModel : ObservableObject
     {
         var selectedComponent = Component;
         var minecraftId = MinecraftVersion!.Id;
-        downloads.Begin($"读取 {selectedComponent} 兼容构建", LoadBuildsCommand.Cancel);
+        IsBuildsLoading = true;
+        Status = $"正在读取 {selectedComponent} 兼容构建…";
         Builds.Clear(); Build = null;
         try
         {
             var items = await loaders.GetBuildsAsync(selectedComponent, minecraftId, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (selectedComponent != Component || minecraftId != MinecraftVersion?.Id) return;
             foreach (var item in items) Builds.Add(item);
             Build = Builds.FirstOrDefault();
             Status = items.Count == 0 ? "该组件没有适用于所选 Minecraft 的构建，请选择其他版本。" : $"找到 {items.Count} 个兼容构建，请选择后安装。";
-            downloads.End(Status);
         }
-        catch (OperationCanceledException) { Status = "构建读取已取消。"; downloads.End(Status); }
-        catch (Exception exception) { Status = "构建读取失败：" + exception.Message; downloads.End(Status); }
+        catch (OperationCanceledException) { Status = "构建读取已取消。"; }
+        catch (Exception exception) { Status = "构建读取失败：" + exception.Message; }
+        finally { IsBuildsLoading = false; }
     }
 
     [RelayCommand(CanExecute = nameof(CanInstall), IncludeCancelCommand = true)]

@@ -82,7 +82,7 @@
 2. 公共桌面客户端使用授权码与 code verifier 换取令牌，不发送 Client Secret。
 3. CmlLib 的内存账户管理器完成 Xbox / Minecraft 认证与所有权检查。只有完整链路成功后，UI 才切换到正版身份。
 4. 游戏启动前重新执行静默刷新和 Minecraft 认证。需要重新交互登录时，明确提示用户返回 Accounts；不会静默切换到离线身份。
-5. MSAL 缓存使用 Windows DPAPI 的 `CurrentUser` 范围加密，存放在 `%LOCALAPPDATA%\PIgHeAD\Launcher\auth\<client-id>.bin`。Xbox 与 Minecraft 令牌仅保存在内存，不写入设置 JSON。
+5. MSAL 缓存使用 Windows DPAPI 的 `CurrentUser` 范围加密，存放在启动器旁的 `PHL\auth\<client-id>.bin`。Xbox 与 Minecraft 令牌仅保存在内存，不写入设置 JSON。旧版本用户目录中的缓存不自动迁移；新位置首次使用需要重新登录。分享整合包时请移除 `PHL\auth`、个人日志和协议记录。
 6. DPAPI 无法使用或缓存解密失败时，认证会失败并显示错误；没有明文回退。缓存不能直接迁移给另一个 Windows 用户。
 7. **退出并清除缓存**移除此启动器缓存中的 Microsoft 账户，不登出浏览器中的全部 Microsoft 账户。
 8. 启动器不记录完整启动命令，写入的游戏控制台日志会遮盖当前 Minecraft access token。Minecraft 客户端协议仍需要把令牌传给 Java 进程，因此同一 Windows 用户下有权限检查进程参数的软件仍可能看到它。

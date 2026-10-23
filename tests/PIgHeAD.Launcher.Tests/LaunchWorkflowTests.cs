@@ -18,7 +18,7 @@ public sealed class LaunchWorkflowTests
 
         Assert.True(context.Downloads.IsGameRunning);
         Assert.False(context.Home.LaunchGameCommand.CanExecute(null));
-        Assert.False(context.Versions.InstallSelectedCommand.CanExecute(null));
+        Assert.False(context.Versions.RepairSelectedCommand.CanExecute(null));
         Assert.False(context.Accounts.SignInCommand.CanExecute(null));
         Assert.Equal(4096, context.GameService.LastRequest!.Settings.MaximumMemoryMb);
         Assert.False(context.GameService.LastRequest.AllowDownloads);
@@ -98,13 +98,13 @@ public sealed class LaunchWorkflowTests
     }
 
     [Fact]
-    public async Task FailedInstallationReleasesOperationState()
+    public async Task FailedRepairReleasesOperationState()
     {
         var context = new LauncherTestContext();
         await context.Main.InitializeAsync(CancellationToken.None);
         context.GameService.InstallError = new InvalidOperationException("Network unavailable");
 
-        await context.Versions.InstallSelectedCommand.ExecuteAsync(null);
+        await context.Versions.RepairSelectedCommand.ExecuteAsync(null);
 
         Assert.True(context.Downloads.IsIdle);
         Assert.Contains("Network unavailable", context.Downloads.Status);

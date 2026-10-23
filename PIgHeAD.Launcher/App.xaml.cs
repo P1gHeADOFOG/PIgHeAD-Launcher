@@ -1,6 +1,8 @@
 using System.Windows;
 using PIgHeAD.Launcher.Bootstrap;
 using PIgHeAD.Launcher.Services.Consent;
+using PIgHeAD.Launcher.Services.Settings;
+using PIgHeAD.Launcher.Services.Presentation;
 using PIgHeAD.Launcher.ViewModels;
 using PIgHeAD.Launcher.Views;
 
@@ -18,15 +20,19 @@ public partial class App : Application
         try
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            var consent = new UserConsentService();
+            var paths = new LauncherPaths(AppContext.BaseDirectory);
+            System.IO.Directory.CreateDirectory(paths.DataDirectory);
+            await PresentationSettings.Current.InitializeAsync(System.IO.Path.Combine(paths.DataDirectory, "appearance.json"), lifetime.Token);
+            var consent = new UserConsentService(paths.ConsentFile);
             if (!await consent.IsAcceptedAsync(lifetime.Token)
                 && new ConsentWindow(new ConsentViewModel(consent)).ShowDialog() != true)
             {
                 Shutdown();
                 return;
             }
-            var window = AppBootstrapper.CreateMainWindow();
+            var window = AppBootstrapper.CreateMainWindow(paths);
             mainViewModel = (MainViewModel)window.DataContext;
+            await mainViewModel.Settings.LoadCommand.ExecuteAsync(null);
             MainWindow = window;
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             window.Show();
@@ -38,7 +44,7 @@ public partial class App : Application
         }
         catch (Exception exception)
         {
-            MessageBox.Show($"启动器无法启动：{exception.Message}", "PIgHeAD - 猪头启动器",
+            MessageBox.Show(PresentationSettings.Current.Localize($"启动器无法启动：{exception.Message}"), PresentationSettings.Current.Localize("PIgHeAD - 猪头启动器"),
                 MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }

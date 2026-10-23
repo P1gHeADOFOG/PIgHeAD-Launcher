@@ -56,11 +56,12 @@ public partial class MainViewModel : ObservableObject
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
-        await Settings.LoadCommand.ExecuteAsync(null);
+        if (!Settings.IsLoaded) await Settings.LoadCommand.ExecuteAsync(null);
         if (Settings.SavedSettings is not null)
         {
-            await Versions.RefreshLocalCommand.ExecuteAsync(null);
-            await Accounts.RestoreAsync(cancellationToken);
+            using var registration = cancellationToken.Register(CancelPendingOperations);
+            await Task.WhenAll(Versions.RefreshLocalCommand.ExecuteAsync(null),
+                Accounts.RestoreAsync(cancellationToken), Downloads.Catalog?.EnsureLoadedAsync() ?? Task.CompletedTask);
         }
     }
 
@@ -68,16 +69,17 @@ public partial class MainViewModel : ObservableObject
     {
         Settings.LoadCommand.Cancel();
         Settings.SaveCommand.Cancel();
+        Settings.SwitchGameDirectoryCommand.Cancel();
         Versions.RefreshLocalCommand.Cancel();
-        Versions.LoadOnlineCommand.Cancel();
-        Versions.InstallSelectedCommand.Cancel();
+        Versions.ShowDetailsCommand.Cancel();
+        Versions.RequestDeleteCommand.Cancel();
+        Versions.ConfirmDeleteCommand.Cancel();
+        Versions.ViewModsCommand.Cancel();
         Versions.ImportPathCommand.Cancel();
         Versions.RepairSelectedCommand.Cancel();
         Accounts.SignInCommand.Cancel();
         Home.LaunchGameCommand.Cancel();
-        Downloads.Catalog?.LoadMinecraftCommand.Cancel();
-        Downloads.Catalog?.LoadBuildsCommand.Cancel();
-        Downloads.Catalog?.InstallCommand.Cancel();
+        Downloads.Catalog?.CancelPendingOperations();
     }
 
     [RelayCommand]

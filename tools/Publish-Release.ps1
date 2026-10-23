@@ -1,9 +1,12 @@
 param(
     [ValidateSet('win-x64')][string]$Runtime = 'win-x64',
-    [string]$OutputDirectory = 'artifacts\release'
+    [string]$OutputDirectory = 'artifacts\release',
+    [switch]$SingleFile,
+    [switch]$FrameworkDependent
 )
 
 $ErrorActionPreference = 'Stop'
+if ($FrameworkDependent -and !$SingleFile) { throw '-FrameworkDependent requires -SingleFile.' }
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Push-Location $repository
 try {
@@ -15,6 +18,7 @@ try {
         throw 'Release output must remain inside the repository artifacts directory.'
     }
     $bundleName = "PIgHeAD-$version-$Runtime"
+    if ($FrameworkDependent) { $bundleName += '-lite' }
     $publishDirectory = Join-Path $outputRoot $bundleName
     $archivePath = Join-Path $outputRoot ($bundleName + '.zip')
     if ((Test-Path -LiteralPath $publishDirectory) -or (Test-Path -LiteralPath $archivePath)) {
@@ -27,7 +31,7 @@ try {
 
     $documents = Join-Path $publishDirectory 'docs'
     New-Item -ItemType Directory -Path $documents | Out-Null
-    Copy-Item -LiteralPath 'README.md' -Destination $publishDirectory
+    Copy-Item -LiteralPath 'README.md', 'README.en.md' -Destination $publishDirectory
     Get-ChildItem -LiteralPath 'docs' -Filter '*.md' -File | Copy-Item -Destination $documents
 
     $noticeDirectory = Join-Path $publishDirectory 'ThirdPartyNotices'
@@ -86,9 +90,28 @@ try {
     $commit = (& git rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'Cannot determine the source commit.' }
     [ordered]@{
-        version = $version; runtime = $Runtime; selfContained = $true
+        version = $version; runtime = $Runtime; selfContained = !$FrameworkDependent; singleFile = [bool]$SingleFile
         sourceCommit = $commit; builtAtUtc = [DateTimeOffset]::UtcNow.ToString('o')
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $publishDirectory 'build-info.json') -Encoding UTF8
+
+    if ($SingleFile) {
+        $singleFileDirectory = Join-Path $outputRoot 'single-file'
+        $selfContained = (!$FrameworkDependent).ToString().ToLowerInvariant()
+        & dotnet publish 'PIgHeAD.Launcher\PIgHeAD.Launcher.csproj' -c Release -r $Runtime --self-contained $selfContained `
+            '-p:PublishProfile=SingleFile' "-p:ReleaseContentDirectory=$publishDirectory" -o $singleFileDirectory
+        if ($LASTEXITCODE -ne 0) { throw 'Single-file dotnet publish failed.' }
+        $files = @(Get-ChildItem -LiteralPath $singleFileDirectory -File -Recurse -Force)
+        if ($files.Count -ne 1 -or $files[0].Name -ne 'PIgHeAD.Launcher.exe') {
+            throw 'Single-file publish must produce exactly one EXE with no companion files.'
+        }
+        $executablePath = Join-Path $outputRoot ($bundleName + '.exe')
+        Move-Item -LiteralPath $files[0].FullName -Destination $executablePath
+        $hash = (Get-FileHash -LiteralPath $executablePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$hash  $([IO.Path]::GetFileName($executablePath))" | Set-Content -LiteralPath (Join-Path $outputRoot 'SHA256SUMS.txt') -Encoding ASCII
+        Write-Output "Standalone launcher: $executablePath"
+        Write-Output "SHA256: $hash"
+        return
+    }
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     Add-Type -AssemblyName System.IO.Compression

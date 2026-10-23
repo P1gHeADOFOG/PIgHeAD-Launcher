@@ -6,15 +6,18 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <Version>0.1.4-beta</Version>
-    <AssemblyVersion>0.1.4.0</AssemblyVersion>
-    <FileVersion>0.1.4.0</FileVersion>
-    <InformationalVersion>0.1.4beta</InformationalVersion>
+    <Version>0.2.2-beta</Version>
+    <AssemblyVersion>0.2.2.0</AssemblyVersion>
+    <FileVersion>0.2.2.0</FileVersion>
+    <InformationalVersion>0.2.2-beta</InformationalVersion>
     <Product>PIgHeAD - 猪头启动器</Product>
     <ApplicationIcon>Resources\Images\pighead.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Resources\Strings.en.json" LogicalName="PIgHeAD.Strings.en.json" WithCulture="false" />
+    <EmbeddedResource Include="..\docs\User-Agreement.en.md" LogicalName="PIgHeAD.UserAgreement.en.md" WithCulture="false" />
+    <EmbeddedResource Include="..\docs\Disclaimer.en.md" LogicalName="PIgHeAD.Disclaimer.en.md" WithCulture="false" />
     <PackageReference Include="CmlLib.Core.Installer.Forge" Version="2.0.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="CmlLib.Core" Version="4.1.0" />

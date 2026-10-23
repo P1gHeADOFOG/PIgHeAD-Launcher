@@ -1,6 +1,6 @@
 # PIgHeAD 用户协议（草案）
 
-版本：2026-10-21-v1
+版本：2026-10-21-v2
 发布者：PIgHeAD_OFOG
 联系邮箱：p1gheadofog@gmail.com
 
